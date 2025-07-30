@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Language Greetings</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f8ff; /* Light blue background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align to top */
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 1.5rem; /* More rounded corners for the container */
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+            padding: 2.5rem;
+            max-width: 1000px; /* Max width for the table container */
+            width: 100%;
+            margin-top: 2rem; /* Space from the top */
+        }
+        table {
+            width: 100%;
+            border-collapse: separate; /* Allows border-radius on cells */
+            border-spacing: 0;
+        }
+        th, td {
+            padding: 1rem 1.25rem;
+            text-align: left;
+            border-bottom: 1px solid #e0e7ff; /* Light blue border */
+        }
+        th {
+            background-color: #3b82f6; /* Blue header */
+            color: white;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        /* Rounded corners for table headers */
+        th:first-child {
+            border-top-left-radius: 0.75rem;
+        }
+        th:last-child {
+            border-top-right-radius: 0.75rem;
+        }
+        tr:last-child td {
+            border-bottom: none; /* No border for the last row */
+        }
+        td {
+            background-color: #f8fafc; /* Very light gray for rows */
+        }
+        tr:nth-child(even) td {
+            background-color: #f0f4f8; /* Slightly darker for even rows */
+        }
+        .play-button {
+            background-color: #4CAF50; /* Green */
+            color: white;
+            border-radius: 9999px; /* Fully rounded */
+            padding: 0.5rem 1rem;
+            font-weight: bold;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            display: inline-flex; /* Allows text and icon alignment */
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font-size: 0.875rem; /* Smaller font for button in table */
+        }
+        .play-button:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+        .play-button:active {
+            transform: scale(0.95);
+        }
+        .message-box {
+            z-index: 1000; /* Ensure it's on top */
+        }
+        .japanese-text {
+            display: block; /* Ensures Romaji appears below Japanese characters */
+            font-size: 1.1em;
+            margin-bottom: 0.25rem; /* Small space between Japanese and Romaji */
+        }
+        .romaji-text {
+            display: block;
+            font-size: 0.9em;
+            color: #6b7280; /* Slightly muted color for Romaji */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-center text-purple-700 mb-8">
+            🗣️ Interactive Language Greetings Table 🎧
+        </h1>
+
+        <p class="text-md text-center text-gray-700 mb-8">
+            Click the "Play Audio" button next to each translation to hear how it sounds!
+        </p>
+
+        <div class="overflow-x-auto">
+            <table id="greetingsTable" class="min-w-full">
+                <thead>
+                    <tr>
+                        <th>English Greeting</th>
+                        <th>Japanese</th>
+                        <th>German</th>
+                        <th>Spanish</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Table rows will be dynamically loaded here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Message Box for alerts -->
+    <div id="messageBox" class="message-box fixed bottom-4 right-4 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg hidden">
+        This is a message.
+    </div>
+
+    <script>
+        // Data for greetings, including prompts for TTS API and Romaji for Japanese
+        const greetingsData = [
+            {
+                english: "Hello",
+                translations: {
+                    japanese: { text: "こんにちは", romaji: "Konnichiwa", audioPrompt: "Say in Japanese: Konnichiwa" },
+                    german: { text: "Hallo", audioPrompt: "Say in German: Hallo" },
+                    spanish: { text: "Hola", audioPrompt: "Say in Spanish: Hola" }
+                }
+            },
+            {
+                english: "Goodbye",
+                translations: {
+                    japanese: { text: "さようなら", romaji: "Sayonara", audioPrompt: "Say in Japanese: Sayonara" },
+                    german: { text: "Auf Wiedersehen", audioPrompt: "Say in German: Auf Wiedersehen" },
+                    spanish: { text: "Adiós", audioPrompt: "Say in Spanish: Adios" }
+                }
+            },
+            {
+                english: "Good Morning",
+                translations: {
+                    japanese: { text: "おはようございます", romaji: "Ohayō gozaimasu", audioPrompt: "Say in Japanese: Ohayō gozaimasu" },
+                    german: { text: "Guten Morgen", audioPrompt: "Say in German: Guten Morgen" },
+                    spanish: { text: "Buenos días", audioPrompt: "Say in Spanish: Buenos días" }
+                }
+            },
+            {
+                english: "Good Afternoon",
+                translations: {
+                    japanese: { text: "こんにちは", romaji: "Konnichiwa", audioPrompt: "Say in Japanese: Konnichiwa" },
+                    german: { text: "Guten Tag", audioPrompt: "Say in German: Guten Tag" },
+                    spanish: { text: "Buenas tardes", audioPrompt: "Say in Spanish: Buenas tardes" }
+                }
+            },
+            {
+                english: "Good Evening",
+                translations: {
+                    japanese: { text: "こんばんは", romaji: "Konbanwa", audioPrompt: "Say in Japanese: Konbanwa" },
+                    german: { text: "Guten Abend", audioPrompt: "Say in German: Guten Abend" },
+                    spanish: { text: "Buenas noches", audioPrompt: "Say in Spanish: Buenas noches" }
+                }
+            },
+            {
+                english: "See you later",
+                translations: {
+                    japanese: { text: "またね", romaji: "Mata ne", audioPrompt: "Say in Japanese: Mata ne" },
+                    german: { text: "Bis später", audioPrompt: "Say in German: Bis später" },
+                    spanish: { text: "Hasta luego", audioPrompt: "Say in Spanish: Hasta luego" }
+                }
+            }
+        ];
+
+        // Function to display messages to the user (instead of alert)
+        function showMessage(message, duration = 3000) {
+            const messageBox = document.getElementById('messageBox');
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, duration);
+        }
+
+        // Helper function to convert base64 to ArrayBuffer
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        // Helper function to convert PCM audio data to WAV format
+        function pcmToWav(pcmData, sampleRate) {
+            const numChannels = 1; // Mono audio
+            const bytesPerSample = 2; // 16-bit PCM
+
+            const buffer = new ArrayBuffer(44 + pcmData.byteLength);
+            const view = new DataView(buffer);
+
+            // RIFF chunk descriptor
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + pcmData.byteLength, true);
+            writeString(view, 8, 'WAVE');
+
+            // FMT sub-chunk
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); // Subchunk1Size for PCM
+            view.setUint16(20, 1, true);  // AudioFormat (1 for PCM)
+            view.setUint16(22, numChannels, true);
+            view.setUint32(24, sampleRate, true);
+            view.setUint32(28, sampleRate * numChannels * bytesPerSample, true); // ByteRate
+            view.setUint16(32, numChannels * bytesPerSample, true); // BlockAlign
+            view.setUint16(34, 8 * bytesPerSample, true); // BitsPerSample
+
+            // DATA sub-chunk
+            writeString(view, 36, 'data');
+            view.setUint32(40, pcmData.byteLength, true);
+
+            // Write PCM data
+            const pcmBytes = new Uint8Array(buffer, 44);
+            for (let i = 0; i < pcmData.length; i++) {
+                view.setInt16(44 + i * bytesPerSample, pcmData[i], true);
+            }
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+
+        // Helper function to write string to DataView
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+
+        // Function to determine the appropriate voice name for a given language
+        function getVoiceNameForLanguage(language) {
+            switch (language) {
+                case 'japanese': return 'Leda'; // Youthful voice for Japanese
+                case 'german': return 'Charon'; // Informative voice for German
+                case 'spanish': return 'Callirrhoe'; // Easy-going voice for Spanish
+                default: return 'Zephyr'; // Default voice
+            }
+        }
+
+        // Function to play audio using the Gemini TTS API
+        async function playAudio(audioPrompt, language, button) {
+            button.disabled = true; // Disable button while audio is loading
+            button.textContent = 'Loading...';
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: audioPrompt }]
+                }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: getVoiceNameForLanguage(language) }
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            const apiKey = ""; // API key will be provided by the environment
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+                }
+
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType;
+
+                if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000; // Default to 16kHz
+
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData); // API returns signed PCM16
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        button.disabled = false;
+                        button.textContent = 'Play Audio';
+                        URL.revokeObjectURL(audioUrl); // Clean up the object URL
+                    };
+                } else {
+                    console.error("Audio data or mime type missing/invalid:", result);
+                    showMessage("Failed to play audio. Please try again.");
+                    button.disabled = false;
+                    button.textContent = 'Play Audio';
+                }
+            } catch (error) {
+                console.error("Error playing audio:", error);
+                showMessage("An error occurred while playing audio. Please check your connection.");
+                button.disabled = false;
+                button.textContent = 'Play Audio';
+            }
+        }
+
+        // Function to render the table
+        function renderTable() {
+            const tableBody = document.querySelector('#greetingsTable tbody');
+            tableBody.innerHTML = ''; // Clear existing content
+
+            greetingsData.forEach(greeting => {
+                const row = tableBody.insertRow();
+
+                // English Greeting Column
+                const englishCell = row.insertCell();
+                englishCell.textContent = greeting.english;
+
+                // Japanese Translation Column
+                const japaneseCell = row.insertCell();
+                const japaneseTextDiv = document.createElement('div');
+                japaneseTextDiv.className = 'flex flex-col items-start'; // Use flexbox for vertical alignment
+
+                const japaneseText = document.createElement('span');
+                japaneseText.className = 'japanese-text'; // Apply specific class for styling
+                japaneseText.textContent = greeting.translations.japanese.text;
+
+                const japaneseRomaji = document.createElement('span');
+                japaneseRomaji.className = 'romaji-text'; // Apply specific class for styling
+                japaneseRomaji.textContent = greeting.translations.japanese.romaji;
+
+                japaneseTextDiv.appendChild(japaneseText);
+                japaneseTextDiv.appendChild(japaneseRomaji);
+                japaneseCell.appendChild(japaneseTextDiv);
+
+
+                const japaneseButton = document.createElement('button');
+                japaneseButton.className = 'play-button ml-2';
+                japaneseButton.innerHTML = 'Play Audio <span class="ml-1">▶️</span>'; // Added play icon
+                japaneseButton.onclick = () => playAudio(greeting.translations.japanese.audioPrompt, 'japanese', japaneseButton);
+                japaneseCell.appendChild(japaneseButton);
+
+                // German Translation Column
+                const germanCell = row.insertCell();
+                const germanText = document.createElement('span');
+                germanText.textContent = greeting.translations.german.text;
+                const germanButton = document.createElement('button');
+                germanButton.className = 'play-button ml-2';
+                germanButton.innerHTML = 'Play Audio <span class="ml-1">▶️</span>';
+                germanButton.onclick = () => playAudio(greeting.translations.german.audioPrompt, 'german', germanButton);
+                germanCell.appendChild(germanText);
+                germanCell.appendChild(germanButton);
+
+                // Spanish Translation Column
+                const spanishCell = row.insertCell();
+                const spanishText = document.createElement('span');
+                spanishText.textContent = greeting.translations.spanish.text;
+                const spanishButton = document.createElement('button');
+                spanishButton.className = 'play-button ml-2';
+                spanishButton.innerHTML = 'Play Audio <span class="ml-1">▶️</span>';
+                spanishButton.onclick = () => playAudio(greeting.translations.spanish.audioPrompt, 'spanish', spanishButton);
+                spanishCell.appendChild(spanishText);
+                spanishCell.appendChild(spanishButton);
+            });
+        }
+
+        // Render the table when the window loads
+        window.onload = renderTable;
+    </script>
+</body>
+</html>
