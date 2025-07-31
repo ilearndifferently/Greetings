@@ -253,7 +253,7 @@
             }
         }
 
-        // Function to play audio using the Gemini TTS API
+        // Function to play audio using the Gemini TTS API with exponential backoff
         async function playAudio(audioPrompt, language, button) {
             button.disabled = true; // Disable button while audio is loading
             button.textContent = 'Loading...';
@@ -273,54 +273,72 @@
                 model: "gemini-2.5-flash-preview-tts"
             };
 
-            const apiKey = "AIzaSyAWgS7lWK68Uajcr49FRg_Tyw8hutFbqJg"; // API key will be provided by the environment
+            // IMPORTANT: If you are hosting this file outside of the Canvas environment (e.g., on GitHub Pages),
+            // you MUST replace the empty string below with your actual Google Cloud API Key.
+            // You also need to ensure the "Generative Language API" is enabled in your Google Cloud Project.
+            // You can get an API key from Google AI Studio: https://aistudio.google.com/app/apikey
+            // And enable APIs in Google Cloud Console: https://console.cloud.google.com/apis/library
+            const apiKey = "AIzaSyAWgS7lWK68Uajcr49FRg_Tyw8hutFbqJg"; // <--- PASTE YOUR API KEY HERE IF HOSTING EXTERNALLY
+
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+            let retryCount = 0;
+            let delay = 1000; // Start with 1 second delay
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+            while (retryCount < 3) { // Try up to 3 times
+                try {
+                    const response = await fetch(apiUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        const part = result?.candidates?.[0]?.content?.parts?.[0];
+                        const audioData = part?.inlineData?.data;
+                        const mimeType = part?.inlineData?.mimeType;
+
+                        if (audioData && mimeType && mimeType.startsWith("audio/")) {
+                            const sampleRateMatch = mimeType.match(/rate=(\d+)/);
+                            const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000; // Default to 16kHz
+
+                            const pcmData = base64ToArrayBuffer(audioData);
+                            const pcm16 = new Int16Array(pcmData); // API returns signed PCM16
+                            const wavBlob = pcmToWav(pcm16, sampleRate);
+                            const audioUrl = URL.createObjectURL(wavBlob);
+                            const audio = new Audio(audioUrl);
+                            audio.play();
+
+                            audio.onended = () => {
+                                button.disabled = false;
+                                button.textContent = 'Play Audio';
+                                URL.revokeObjectURL(audioUrl); // Clean up the object URL
+                            };
+                            return; // Audio played successfully, exit loop
+                        } else {
+                            console.error("Audio data or mime type missing/invalid:", result);
+                            showMessage("Failed to play audio. Invalid response from API.");
+                        }
+                    } else {
+                        const errorText = await response.text();
+                        console.error(`API error: ${response.status} ${response.statusText} - ${errorText}`);
+                        showMessage(`API error: ${response.status}. Retrying...`);
+                    }
+                } catch (error) {
+                    console.error("Network or parsing error:", error);
+                    showMessage("Network error. Retrying...");
                 }
 
-                const result = await response.json();
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (audioData && mimeType && mimeType.startsWith("audio/")) {
-                    const sampleRateMatch = mimeType.match(/rate=(\d+)/);
-                    const sampleRate = sampleRateMatch ? parseInt(sampleRateMatch[1], 10) : 16000; // Default to 16kHz
-
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    const pcm16 = new Int16Array(pcmData); // API returns signed PCM16
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
-                    const audio = new Audio(audioUrl);
-                    audio.play();
-
-                    audio.onended = () => {
-                        button.disabled = false;
-                        button.textContent = 'Play Audio';
-                        URL.revokeObjectURL(audioUrl); // Clean up the object URL
-                    };
-                } else {
-                    console.error("Audio data or mime type missing/invalid:", result);
-                    showMessage("Failed to play audio. Please try again.");
-                    button.disabled = false;
-                    button.textContent = 'Play Audio';
-                }
-            } catch (error) {
-                console.error("Error playing audio:", error);
-                showMessage("An error occurred while playing audio. Please check your connection.");
-                button.disabled = false;
-                button.textContent = 'Play Audio';
+                retryCount++;
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Double the delay for the next retry
             }
+
+            // If loop finishes, all retries failed
+            showMessage("An error occurred when playing audio after multiple attempts. Please try again later.");
+            button.disabled = false;
+            button.textContent = 'Play Audio';
         }
 
         // Function to render the table
